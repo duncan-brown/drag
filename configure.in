@@ -1,0 +1,56 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(src/timer.h)
+AC_CANONICAL_SYSTEM
+AM_INIT_AUTOMAKE(drag, 1.2)
+AM_CONFIG_HEADER(src/config.h)
+
+AC_WITH_CC
+AC_WITH_EXTRA_CPPFLAGS
+AC_WITH_EXTRA_CFLAGS
+AC_WITH_EXTRA_LDFLAGS
+
+AC_ENABLE_FFTTEST
+AC_ENABLE_TCPTEST
+AM_CONDITIONAL(FFTTEST, test x$ffttest = xtrue)
+AM_CONDITIONAL(TCPTEST, test x$tcptest = xtrue)
+AM_CONDITIONAL(FFTTCPTEST, test x$ffttest = xtrue -a x$tcptest = xtrue )
+
+AC_DEFINE_UNQUOTED(BUILD_SYSTEM_TYPE, "$build")
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+AC_PROG_LN_S
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(unistd.h malloc.h getopt.h netdb.h)
+AC_CHECK_HEADERS(sys/types.h sys/time.h sys/socket.h arpa/inet.h)
+AC_CHECK_HEADERS(sfftw.h fftw.h, break)
+AC_CHECK_HEADERS(srfftw.h rfftw.h, break)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_TYPE_SOCKLEN_T
+AC_HEADER_TIME
+AC_CHECK_SIZEOF(int, 0)
+AC_CHECK_SIZEOF(long long, 0)
+        
+dnl Checks for library functions.
+AC_FUNC_ALLOCA
+AC_CHECK_LIB(m, sin)
+AC_CHECK_FUNCS(gettimeofday)
+AC_CHECK_FUNCS(BSDgettimeofday)
+AC_CHECK_FUNCS(gethrtime)
+AC_CHECK_FUNCS(getopt)
+AC_SEARCH_LIBS(fftw_one, sfftw fftw, ,
+  AC_MSG_ERROR([FFTW must be properly installed.]), -lm)
+AC_SEARCH_LIBS(rfftw_one, srfftw rfftw, ,
+  AC_MSG_ERROR([FFTW must be properly installed.]), -lm)
+AC_SFFTW_WORKS
+AC_SEARCH_LIBS(socket, socket)
+AC_SEARCH_LIBS(inet_addr, xnet)
+
+AC_OUTPUT(src/Makefile Makefile)
