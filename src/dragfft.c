@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <timer.h>
+#include <config.h>
 
 #ifdef HAVE_SFFTW_H
 #include <sfftw.h>
@@ -11,7 +12,9 @@
 #error "don't have either sfftw.h or fftw.h"
 #endif
 
-#include <config.h>
+#ifndef HAVE_VALLOC
+#define valloc malloc
+#endif
 
 #ifndef M_LOG2E
 #define M_LOG2E 1.4426950408889634074 /* log_2 e */
@@ -20,6 +23,8 @@
 #define FILENAME "dragfft-" BUILD_SYSTEM_TYPE ".out"
 
 double fftw_flops( int size, double *secperfft );
+fftw_complex *in;
+fftw_complex *out;
 
 int main( void )
 {
@@ -27,6 +32,11 @@ int main( void )
   int        size    = 1;
   int        power   = 0;
   FILE      *fp;
+
+  in  = valloc( maxsize * sizeof( fftw_complex ) );
+  out = valloc( maxsize * sizeof( fftw_complex ) );
+  memset( in,  0, maxsize * sizeof( fftw_complex ) );
+  memset( out, 0, maxsize * sizeof( fftw_complex ) );
 
   fp = fopen( FILENAME , "w" );
   if ( !fp )
@@ -49,7 +59,7 @@ int main( void )
 
     megaflops = fftw_flops( size, &secperfft ) / 1e+6;
 
-    fprintf( fp, "%8d\t%e\t%e\n", power, megaflops, 1e+3 * secperfft );
+    fprintf( fp, "%8d\t%.3e\t%.3e\n", power, megaflops, 1e+3 * secperfft );
     fflush( fp );
 
   }
@@ -71,19 +81,16 @@ double fftw_flops( int size, double *secperfft )
   double        minratio = 1e6; /* best performance (second per fft)       */
   int           nreps    = 10;  /* number of repititions to find best time */
   int           nffts    = 1;   /* anticipated number of ffts to take tmin */
-  drag_time     start    = drag_get_time();
-
-  fftw_complex *in;
-  fftw_complex *out;
   fftw_plan     plan;
   
-  in   = calloc( size, sizeof( fftw_complex ) );
-  out  = calloc( size, sizeof( fftw_complex ) );
-  plan = fftw_create_plan( size, FFTW_FORWARD, FFTW_MEASURE | FFTW_USE_WISDOM );
+  plan = fftw_create_plan_specific( size, FFTW_FORWARD,
+      FFTW_MEASURE | FFTW_OUT_OF_PLACE | FFTW_USE_WISDOM, in, 1, out, 1 );
+  memset( in,  0, size * sizeof( fftw_complex ) );
+  memset( out, 0, size * sizeof( fftw_complex ) );
 
   while ( nreps-- > 0 )
   {
-    double time = 0;
+    double duration = 0;
     double flops;
     double ratio;
 
@@ -101,23 +108,21 @@ double fftw_flops( int size, double *secperfft )
       }
       end = drag_get_time();
 
-      time = drag_time_to_sec( drag_time_diff( end, begin ) );
+      duration = drag_time_to_sec( drag_time_diff( end, begin ) );
 
-      if ( time < tmin )
+      if ( duration < tmin )
         nffts *= 2;
       else
         break;
     }
 
-    ratio    = time/nffts;
+    ratio    = duration/nffts;
     flops    = fftflop/ratio;
     maxflops = flops > maxflops ? flops : maxflops;
     minratio = ratio < minratio ? ratio : minratio;
   }
 
   fftw_destroy_plan( plan );
-  free( out );
-  free( in );
 
   *secperfft = minratio;
   return maxflops;
