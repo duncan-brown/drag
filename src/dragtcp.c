@@ -27,8 +27,12 @@ extern char *optarg;
 extern int   optind;
 extern int   optopt;
 
-enum { buflen = 1024, maxnumbuf = 1024 };
-static char buf[buflen];
+enum { kilobyte = 1024 };
+enum { nummegabytes = 16 };
+const numbytes = nummegabytes * kilobyte * kilobyte;
+
+enum { minbufsz = 64, maxbufsz = 16384 };
+static char buf[maxbufsz];
 static struct sockaddr_in locaddr; /* local  */
 static struct sockaddr_in remaddr; /* remote */
 static socklen_t locaddrsize = sizeof( locaddr );
@@ -151,7 +155,7 @@ int loc( const char *remhost )
 {
   FILE *fp;
   int   s;
-  int   numbuf;
+  int   bufsz;
   char  sendrecv = recflg ? 'r' : 's' ; /* local sends or receives */
 
   remaddr.sin_family      = AF_INET;
@@ -194,7 +198,7 @@ int loc( const char *remhost )
   */
   fp = stdout;
 
-  if ( fprintf( fp, "# bytes\ttime (seconds) \trate (10^6 bytes per second)\n")
+  if ( fprintf( fp, "# bufsz\ttime (seconds) \trate (10^6 bytes per second)\n")
        < 0 )
   {
     perror( "fprintf()" );
@@ -208,17 +212,19 @@ int loc( const char *remhost )
     return 1;
   }
 
-  for ( numbuf = 1; numbuf <= maxnumbuf; numbuf *= 2 )
+
+  for ( bufsz = minbufsz; bufsz <= maxbufsz; bufsz *= 2 )
   {
-    int nbuf;
+    int numbuf = numbytes / bufsz;
     int nbytes = 0;
+    int nbuf;
     double duration;
     drag_time end;
     drag_time begin = drag_get_time();
     for ( nbuf = 0; nbuf < numbuf; ++nbuf )
     {
       int bytes;
-      if ( ( bytes = READWRITE( s, buf, sizeof( buf ) ) ) < 0 )
+      if ( ( bytes = READWRITE( s, buf, bufsz ) ) < 0 )
       {
         recflg ?  perror( "read()" ) : perror( "write()" ) ;
         return 1;
@@ -227,7 +233,11 @@ int loc( const char *remhost )
     }
     end = drag_get_time();
     duration = drag_time_to_sec( drag_time_diff( end, begin ) );
-    fprintf( fp, "%7d\t%.3e\t%6.2f\n", nbytes, duration, nbytes/(1e6*duration) );
+    if ( nbytes != numbytes )
+    {
+      fprintf( stderr, "wrong number of bytes: %d\n", nbytes );
+    }
+    fprintf( fp, "%7d\t%.3e\t%6.2f\n", bufsz, duration, nbytes/(1e6*duration) );
   }
 
   /*
@@ -253,7 +263,7 @@ int rem( void )
 {
   int  s;
   int  ns;
-  int  numbuf;
+  int  bufsz;
   int  reuseaddr = 1;
   char sendrecv;
 
@@ -317,37 +327,24 @@ int rem( void )
       return 1;
   }
 
-  for ( numbuf = 1; numbuf <= maxnumbuf; numbuf *= 2 )
+  for ( bufsz = minbufsz; bufsz <= maxbufsz; bufsz *= 2 )
   {
-    int nbuf;
+    int numbuf = numbytes / bufsz;
     int nbytes = 0;
+    int nbuf;
     for ( nbuf = 0; nbuf < numbuf; ++nbuf )
     {
       int bytes;
-      if ( ( bytes = READWRITE( ns, buf, sizeof( buf ) ) ) < 0 )
+      if ( ( bytes = READWRITE( ns, buf, bufsz ) ) < 0 )
       {
-        recflg ? perror( "read()" ) : perror( "write()" ) ;
+        recflg ?  perror( "read()" ) : perror( "write()" ) ;
         return 1;
       }
-#if 0
-      if ( bytes != sizeof( buf ) )
-      {
-        fputs( "wrong size\n", stderr );
-        exit( 1 );
-      }
-      {
-        int i;
-        for ( i = 0; i < sizeof( buf ); ++i )
-        {
-          if ( buf[i] != '*' )
-          {
-            fprintf( stderr, "wrong data %c at i = %d\n", buf[i], i );
-            exit( 1 );
-          }
-        }
-      }
-#endif
       nbytes += bytes;
+    }
+    if ( nbytes != numbytes )
+    {
+      fprintf( stderr, "wrong number of bytes: %d\n", nbytes );
     }
   }
 
