@@ -16,7 +16,7 @@
 #define FILENAME "dragtcp-" BUILD_SYSTEM_TYPE ".out"
 #define VERBOSE( msg ) ( void )( verbose ? puts( msg ) : 0 )
 #define READWRITE( sock, buf, size ) \
-  ( recflg ? read( sock, buf, size ) : write( sock, buf, size ) )
+  ( recflg ? mread( sock, buf, size ) : write( sock, buf, size ) )
 
 int loc( const char *remhost );
 int rem( void );
@@ -329,6 +329,24 @@ int rem( void )
         recflg ? perror( "read()" ) : perror( "write()" ) ;
         return 1;
       }
+#if 0
+      if ( bytes != sizeof( buf ) )
+      {
+        fputs( "wrong size\n", stderr );
+        exit( 1 );
+      }
+      {
+        int i;
+        for ( i = 0; i < sizeof( buf ); ++i )
+        {
+          if ( buf[i] != '*' )
+          {
+            fprintf( stderr, "wrong data %c at i = %d\n", buf[i], i );
+            exit( 1 );
+          }
+        }
+      }
+#endif
       nbytes += bytes;
     }
   }
@@ -365,3 +383,37 @@ void usage( int error, const char *program )
   fprintf( fp, "  -p port       specify the port (2000 is default)\n" );
   exit( error );
 }
+
+/*
+ *                      M R E A D
+ *
+ * This function performs the function of a read(II) but will
+ * call read(II) multiple times in order to get the requested
+ * number of characters.  This can be necessary because
+ * network connections don't deliver data with the same
+ * grouping as it is written with.  Written by Robert S. Miles, BRL.
+ */
+int mread( int fd, char *bufp, unsigned n )
+{
+  unsigned count = 0;
+  int      nread;
+
+  do
+  {
+    nread = read( fd, bufp, n - count );
+    if ( nread < 0 )
+    {
+      perror( "mread()" );
+      return -1;
+    }
+    if ( nread == 0 )
+    {
+      return (int)count;
+    }
+    count += (unsigned)nread;
+    bufp  += nread;
+  }
+  while ( count < n );
+  return (int)count;
+}
+
