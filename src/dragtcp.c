@@ -20,12 +20,12 @@
 
 int loc( const char *remhost );
 int rem( void );
+int mread( int fd, char *bufp, unsigned n );
 void usage( int error, const char *program );
 
 extern char *optarg;
 extern int   optind;
 extern int   optopt;
-extern int   errno;
 
 enum { buflen = 1024, maxnumbuf = 1024 };
 static char buf[buflen];
@@ -212,7 +212,7 @@ int loc( const char *remhost )
   {
     int nbuf;
     int nbytes = 0;
-    double time;
+    double duration;
     drag_time end;
     drag_time begin = drag_get_time();
     for ( nbuf = 0; nbuf < numbuf; ++nbuf )
@@ -226,8 +226,8 @@ int loc( const char *remhost )
       nbytes += bytes;
     }
     end = drag_get_time();
-    time = drag_time_to_sec( drag_time_diff( end, begin ) );
-    fprintf( fp, "%7d\t%e\t%f\n", nbytes, time, nbytes/(1e6*time) );
+    duration = drag_time_to_sec( drag_time_diff( end, begin ) );
+    fprintf( fp, "%7d\t%.3e\t%6.2f\n", nbytes, duration, nbytes/(1e6*duration) );
   }
 
   /*
