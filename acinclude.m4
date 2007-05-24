@@ -111,14 +111,8 @@ AC_DEFUN(DRAG_SFFTW_WORKS,
 [AC_MSG_CHECKING(whether single precison FFTW works)
 AC_TRY_RUN([
 #include <stdio.h>
-#ifdef HAVE_SFFTW_H
-#include <sfftw.h>
-#elif HAVE_FFTW_H
-#include <fftw.h>
-#else
-#error "don't have either sfftw.h or fftw.h"
-#endif
-int main() { return sizeof(fftw_real) - 4; } ],
+#include <fftw3.h>
+int main() { return sizeof(fftwf_complex) - 8; } ],
 AC_MSG_RESULT(yes),
 AC_MSG_RESULT(no)
 AC_MSG_ERROR([single precision FFTW must be properly installed.])

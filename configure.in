@@ -29,8 +29,7 @@ dnl Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS(unistd.h malloc.h getopt.h netdb.h)
 AC_CHECK_HEADERS(sys/types.h sys/time.h sys/socket.h arpa/inet.h)
-AC_CHECK_HEADERS(sfftw.h fftw.h, break)
-AC_CHECK_HEADERS(srfftw.h rfftw.h, break)
+AC_CHECK_HEADERS(fftw3.h, break)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -48,9 +47,7 @@ AC_CHECK_FUNCS(BSDgettimeofday)
 AC_CHECK_FUNCS(gethrtime)
 AC_CHECK_FUNCS(getopt)
 AC_CHECK_FUNCS(valloc)
-AC_SEARCH_LIBS(fftw_one, sfftw fftw, ,
-  AC_MSG_ERROR([FFTW must be properly installed.]), -lm)
-AC_SEARCH_LIBS(rfftw_one, srfftw rfftw, ,
+AC_SEARCH_LIBS(fftwf_execute, fftw3f, ,
   AC_MSG_ERROR([FFTW must be properly installed.]), -lm)
 DRAG_SFFTW_WORKS
 AC_SEARCH_LIBS(socket, socket)
