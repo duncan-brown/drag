@@ -11,7 +11,7 @@
 #define M_LOG2E 1.4426950408889634074 /* log_2 e */
 #endif
 
-#define FILENAME "dragfft-" BUILD_SYSTEM_TYPE ".out"
+#define FILENAME "dragfft-" BUILD_SYSTEM_TYPE "."
 
 double drag_fft_flops( int size, double *secperfft );
 fftwf_complex *in;
@@ -19,45 +19,50 @@ fftwf_complex *out;
 
 int main( void )
 {
-  const int  maxsize = 1048576;
+  char 	     filename[4096];
+  int        maxloops = 1000;
+  int        loop;
+  const int  maxsize = 4194304;
   int        size    = 1;
   int        power   = 0;
   FILE      *fp;
+  time_t ticks = time(NULL);
 
   in  = (fftwf_complex*) fftwf_malloc( maxsize * sizeof( fftwf_complex ) );
   out = (fftwf_complex*) fftwf_malloc( maxsize * sizeof( fftwf_complex ) );
   memset( in,  0, maxsize * sizeof( fftwf_complex ) );
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
 
-  fp = fopen( FILENAME , "w" );
-  if ( !fp )
+  for ( loop = 0; loop < maxloops; ++loop )
   {
-    fprintf( stderr, "could not open file " FILENAME "\n" );
-    exit( 1 );
-  }
+    snprintf( filename, 4096 * sizeof(char), FILENAME "%d.out", loop );
+    fp = fopen( filename, "w" );
+    if ( !fp )
+    {
+      fprintf( stderr, "could not open file " FILENAME "\n" );
+      exit( 1 );
+    }
  
-  fputs( "# log_2(npts)\tmega flops\tms / fft\n", fp );
+    fputs( "# log_2(npts)\tmega flops\tms / fft\n", fp );
 
-  do
-  {
-    double megaflops;
-    double secperfft;
+    for( size = 2; size < maxsize; size *= 2)
+    {
+      double megaflops;
+      double secperfft;
 
-    ++power;
-    size *= 2;
+      ++power;
 
-    fprintf( stderr, "\rsize = %d", size );
+      fprintf( stderr, "\rsize = %d", size );
 
-    megaflops = drag_fft_flops( size, &secperfft ) / 1e+6;
+      megaflops = drag_fft_flops( size, &secperfft ) / 1e+6;
 
-    fprintf( fp, "%8d\t%.3e\t%.3e\n", power, megaflops, 1e+3 * secperfft );
-    fflush( fp );
+      fprintf( fp, "%8d\t%.3e\t%.3e\n", power, megaflops, 1e+3 * secperfft );
+      fflush( fp );
+    }
 
+    fprintf( stderr, " [%d]\n", loop );
+    fclose( fp );
   }
-  while ( size < maxsize );
-
-  fprintf( stderr, "\n" );
-  fclose( fp );
 
   return 0;
 }
