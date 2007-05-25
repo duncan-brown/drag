@@ -33,7 +33,7 @@ int main( void )
   memset( in,  0, maxsize * sizeof( fftwf_complex ) );
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
 
-  for ( loop = 0; loop < maxloops; ++loop )
+  for ( loop = 0, power = 0; loop < maxloops; ++loop )
   {
     snprintf( filename, 4096 * sizeof(char), FILENAME "%d.out", loop );
     fp = fopen( filename, "w" );
