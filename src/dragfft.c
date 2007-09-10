@@ -23,9 +23,9 @@ int main( void )
 {
   char       hostname[512];
   char 	     filename[4096];
-  int        maxloops = 1;
+  int        maxloops = 100;
   int        loop;
-  const int  maxsize = 2097152;
+  const int  maxsize = 8388608;
   int        size    = 1;
   int        power   = 0;
   double     add, mul, fma;
@@ -42,7 +42,7 @@ int main( void )
   memset( in,  0, maxsize * sizeof( fftwf_complex ) );
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
 
-  for ( loop = 0, power = 0; loop < maxloops; ++loop )
+  for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
     snprintf( filename, 4096 * sizeof(char), FILENAME "-%s.%d.out", 
         hostname, loop );
