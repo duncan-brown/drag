@@ -8,9 +8,15 @@
 
 #include <fftw3.h>
 
-#ifndef M_LOG2E
-#define M_LOG2E 1.4426950408889634074 /* log_2 e */
-#endif
+/*
+ideally this constant would be set via ./configure, but right now I
+ don't know how to do it it describes if multiply and add can be fused
+ together (FUSEMULADD==1) or not (FUSEMULADD==2) To my (carsten)
+ knowledge, only SPARC64, PowerPC and Itanium support this right now,
+ Opteron will come in 2008/9 with SSE5. So, right now for Xeon and
+ Opteron this should be 2
+*/
+#define FUSEMULADD 2
 
 #define FILENAME "dragfft-" BUILD_SYSTEM_TYPE
 
@@ -25,7 +31,8 @@ int main( void )
   char 	     filename[4096];
   int        maxloops = 100;
   int        loop;
-  const int  maxsize = 8388608;
+  const int  maxsize = 1<<26; /* ramped this value up for "real"
+				 tests */
   int        size    = 1;
   int        power   = 0;
   double     add, mul, fma;
@@ -78,7 +85,7 @@ int main( void )
 
       fprintf( stderr, "\rsize = %d", size );
 
-      megaflops = drag_fft_flops( size, &secperfft, &add, &mul, &fma ) / 1e+6;
+      megaflops = drag_fft_flops( size, &secperfft, &add, &mul, &fma ) / 1.e+6;
 
       fprintf( fp, "%8d\t%.3e\t%.3e\n", power, megaflops, 1e+3 * secperfft );
       fflush( fp );
@@ -105,7 +112,7 @@ double drag_fft_flops( int size, double *secperfft,
 		double *add, double *mul, double *fma )
 {
   const double  tmin     = 1;   /* minimum run time (seconds)              */
-  double        fftflop  = 5*size*log(size)*M_LOG2E;    /* ops for one fft */
+  double        fftflop;        /* ops for one fft */
   double        maxflops = 0;   /* best performance (flops)                */
   double        minratio = 1e6; /* best performance (second per fft)       */
   int           nreps    = 10;  /* number of repititions to find best time */
@@ -114,6 +121,7 @@ double drag_fft_flops( int size, double *secperfft,
   
   plan = fftwf_plan_dft_1d( size, in, out, FFTW_FORWARD, FFTW_ESTIMATE );
   fftwf_flops( plan, add, mul, fma );
+  fftflop = *add + *mul + FUSEMULADD * *fma;
 
   memset( in,  0, size * sizeof( fftwf_complex ) );
   memset( out, 0, size * sizeof( fftwf_complex ) );
@@ -146,7 +154,7 @@ double drag_fft_flops( int size, double *secperfft,
         break;
     }
 
-    ratio    = duration/nffts;
+    ratio    = duration/ (double) nffts;
     flops    = fftflop/ratio;
     maxflops = flops > maxflops ? flops : maxflops;
     minratio = ratio < minratio ? ratio : minratio;
