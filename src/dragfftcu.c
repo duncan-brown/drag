@@ -5,11 +5,13 @@
 #include <string.h>
 #include <timer.h>
 #include <config.h>
+#include <getopt.h>
 
 #include <fftw3.h>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cufft.h>
 
 
 /*
@@ -24,13 +26,21 @@ ideally this constant would be set via ./configure, but right now I
 
 #define FILENAME "dragfftcu-" BUILD_SYSTEM_TYPE
 
+int use_fftw = 1;
+
 double drag_fft_flops( int size, double *secperfft, 
 		double *add, double *mul, double *fma,
                 double *secperfft_cuda, double *maxflops_cuda );
+
 fftwf_complex *in;
 fftwf_complex *out;
 
-int main( void )
+cufftComplex  *local_in;
+cufftComplex  *local_out;
+cufftComplex  *gpu_in;
+cufftComplex  *gpu_out;
+
+int main( int argc, char* argv[] )
 {
   char       hostname[512];
   char 	     filename[4096];
@@ -45,14 +55,60 @@ int main( void )
   FILE      *fp, *fp_ops;
   time_t ticks = time(NULL);
 
+  struct option long_options[] =
+  {
+    {"use-fftw",        no_argument,    &use_fftw,       1 },
+    {"use-cuda",        no_argument,    &use_fftw,       0 },
+    {"help",            no_argument,    0,              'h'},
+    {0,0,0,0}
+  };
+  int c;
+
+  while ( 1 )
+  {
+    int option_index = 0;
+    size_t optarg_len;
+    c = getopt_long_only( argc, argv, "h", long_options, &option_index );
+    if ( c == -1 ) break;
+    switch ( c )
+    {
+      case 'h':
+        fprintf( stderr, "useage: %s [--use-fftw|--use-cuda]\n", argv[0] );
+        exit( 0 );
+        break;
+
+      default:
+        fprintf( stderr, "error while parsing options\n" );
+        exit( 1 );
+    }
+  }
+  if ( optind < argc )
+  {
+    fprintf( stderr, "error: extraneous command line arguments\n" );
+    exit( 1 );
+  }
+
   gethostname( hostname, 512 );
   if ( (hostptr = strstr( hostname, "." )) )
     *hostptr = (char) NULL;
 
+  /* allocate space for fftws on cpu */
   in  = (fftwf_complex*) fftwf_malloc( maxsize * sizeof( fftwf_complex ) );
   out = (fftwf_complex*) fftwf_malloc( maxsize * sizeof( fftwf_complex ) );
   memset( in,  0, maxsize * sizeof( fftwf_complex ) );
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
+
+  /* allocate local space for cuda ffts */
+  local_in  = malloc( maxsize * sizeof( cufftComplex ) );
+  local_out = malloc( maxsize * sizeof( cufftComplex ) );
+  memset( local_in,  0, maxsize * sizeof( cufftComplex ) );
+  memset( local_out, 0, maxsize * sizeof( cufftComplex ) );
+
+  /* allocate remote space for cuda ffts */
+  cudaMalloc( (void**) &gpu_in, maxsize * sizeof( cufftComplex ) );
+  cudaMalloc( (void**) &gpu_out, maxsize * sizeof( cufftComplex ) );
+  cudaMemset( (void*) gpu_in, 0, maxsize * sizeof( cufftComplex ) );
+  cudaMemset( (void*) gpu_out, 0, maxsize * sizeof( cufftComplex ) );
 
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
@@ -81,7 +137,7 @@ int main( void )
     }
 
 
-    for( size = 1048576; size < maxsize; size *= 2)
+    for( size = 1; size < maxsize; size *= 2)
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
@@ -132,14 +188,25 @@ double drag_fft_flops( int size, double *secperfft,
   float duration_cuda = 0.0f;
   double        fftflop_cuda;        /* ops for one fft */
   double        minratio_cuda = 1e6; /* best performance (second per fft)       */
+
+  cufftHandle   cuplan;
   
+  /* create the fftw plan and number of operations */
   plan = fftwf_plan_dft_1d( size, in, out, FFTW_FORWARD, FFTW_ESTIMATE );
   fftwf_flops( plan, add, mul, fma );
   fftflop = *add + *mul + FUSEMULADD * *fma;
+
+  /* create the cuda plan and number of operations */
+  cufftPlan1d( &cuplan, size, CUFFT_C2C, 1 );
   fftflop_cuda = fftflop;
 
+  /* zero out the fftw memory */
   memset( in,  0, size * sizeof( fftwf_complex ) );
   memset( out, 0, size * sizeof( fftwf_complex ) );
+
+  /* zero out the cuda memory */
+  memset( local_in,  0, size * sizeof( cufftComplex ) );
+  memset( local_out, 0, size * sizeof( cufftComplex ) );
 
   *maxflops_cuda = 0;
   cudaEventCreate( &start );
@@ -169,7 +236,18 @@ double drag_fft_flops( int size, double *secperfft,
 
       while ( iter-- > 0 )
       {
-        fftwf_execute( plan );
+        if ( use_fftw )
+        {
+          fftwf_execute( plan );
+        }
+        else
+        {
+          cudaMemcpy( (void**) &gpu_in, (void**) &local_in, 
+              size * sizeof(cufftComplex), cudaMemcpyHostToDevice );
+          cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
+          cudaMemcpy( (void**) &local_out, (void**) &gpu_out, 
+              size * sizeof(cufftComplex), cudaMemcpyDeviceToHost );
+        }
       }
 
       /* stop cuda timer */
