@@ -72,6 +72,9 @@ int main( int argc, char* argv[] )
     if ( c == -1 ) break;
     switch ( c )
     {
+      case 0:
+        if ( long_options[option_index].flag != 0 ) break;
+
       case 'h':
         fprintf( stderr, "useage: %s [--use-fftw|--use-cuda]\n", argv[0] );
         exit( 0 );
@@ -137,7 +140,7 @@ int main( int argc, char* argv[] )
     }
 
 
-    for( size = 1; size < maxsize; size *= 2)
+    for( size = 1<<20; size < maxsize; size *= 2)
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
@@ -181,7 +184,7 @@ double drag_fft_flops( int size, double *secperfft,
   double        maxflops = 0;   /* best performance (flops)                */
   double        minratio = 1e6; /* best performance (second per fft)       */
   int           nreps    = 10;  /* number of repititions to find best time */
-  int           nffts    = 1;   /* anticipated number of ffts to take tmin */
+  int           nffts    = 64;  /* anticipated number of ffts to take tmin */
   fftwf_plan    plan;
 
   cudaEvent_t start, stop;
