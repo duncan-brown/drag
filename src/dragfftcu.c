@@ -27,6 +27,7 @@ ideally this constant would be set via ./configure, but right now I
 #define FILENAME "dragfftcu-" BUILD_SYSTEM_TYPE
 
 int use_fftw = 1;
+int gpu_copy = 1;
 
 double drag_fft_flops( int size, double *secperfft, 
 		double *add, double *mul, double *fma,
@@ -46,7 +47,7 @@ int main( int argc, char* argv[] )
   char 	     filename[4096];
   int        maxloops = 2;
   int        loop;
-  const int  maxsize = 1<<21; /* ramped this value up for "real"
+  const int  maxsize = 1<<18; /* ramped this value up for "real"
 				 tests */
   int        size    = 1;
   int        power   = 0;
@@ -59,6 +60,7 @@ int main( int argc, char* argv[] )
   {
     {"use-fftw",        no_argument,    &use_fftw,       1 },
     {"use-cuda",        no_argument,    &use_fftw,       0 },
+    {"no-gpu-copy",     no_argument,    &gpu_copy,       0 },
     {"help",            no_argument,    0,              'h'},
     {0,0,0,0}
   };
@@ -115,8 +117,8 @@ int main( int argc, char* argv[] )
 
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
-    snprintf( filename, 4096 * sizeof(char), FILENAME "-%s.%d.out", 
-        hostname, loop );
+    snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.%d.out", 
+        hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy", loop );
     fp = fopen( filename, "w" );
     if ( !fp )
     {
@@ -128,8 +130,8 @@ int main( int argc, char* argv[] )
 
     if ( loop == 0 )
     {
-      snprintf( filename, 4096 * sizeof(char), FILENAME "-%s.ops",
-          hostname );
+      snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.out", 
+          hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy" );
       fp_ops = fopen( filename, "w" );
       if ( !fp_ops )
       {
@@ -140,7 +142,7 @@ int main( int argc, char* argv[] )
     }
 
 
-    for( size = 1<<20; size < maxsize; size *= 2)
+    for( size = 1<<17; size < maxsize; size *= 2)
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
@@ -243,13 +245,17 @@ double drag_fft_flops( int size, double *secperfft,
         {
           fftwf_execute( plan );
         }
-        else
+        else if ( gpu_copy )
         {
           cudaMemcpy( (void**) &gpu_in, (void**) &local_in, 
               size * sizeof(cufftComplex), cudaMemcpyHostToDevice );
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
           cudaMemcpy( (void**) &local_out, (void**) &gpu_out, 
               size * sizeof(cufftComplex), cudaMemcpyDeviceToHost );
+        }
+        else
+        {
+          cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
         }
       }
 
