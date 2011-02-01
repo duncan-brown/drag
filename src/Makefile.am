@@ -1,6 +1,13 @@
-noinst_PROGRAMS = dragfft dragtcp
+if ENABLECUDA
+CUDAPROGS = dragfftcu
+else
+CUDAPROGS =
+endif
+
+noinst_PROGRAMS = dragfft dragtcp $(CUDAPROGS)
 dragfft_SOURCES = dragfft.c timer.c timer.h
 dragtcp_SOURCES = dragtcp.c timer.c timer.h
+dragfftcu_SOURCES = dragfftcu.c timer.c timer.h
 
 if FFTTCPTEST
 TESTS = dragtcp.sh dragfft
@@ -15,6 +22,7 @@ TESTS = notest.sh
 endif
 endif
 endif
+
 
 CLEANFILES = *.out
 EXTRA_DIST = dragtcp.sh notest.sh

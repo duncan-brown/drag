@@ -47,7 +47,7 @@ int main( int argc, char* argv[] )
   char 	     filename[4096];
   int        maxloops = 10;
   int        loop;
-  const int  maxsize = 1<<23; /* ramped this value up for "real"
+  const int  maxsize = 1<<22; /* ramped this value up for "real"
 				 tests */
   int        size    = 1;
   int        power   = 0;

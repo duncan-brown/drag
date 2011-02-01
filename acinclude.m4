@@ -92,6 +92,22 @@ AC_DEFUN(DRAG_ENABLE_TCPTEST,
         ], [ tcptest=false ] )
 ])
 
+AC_DEFUN([DRAG_WITH_CUDA_PREFIX],
+[AC_ARG_WITH(
+  [cuda_prefix],
+  AC_HELP_STRING([--with-cuda-prefix=CUDA_PREFIX],[location where to find CUDA installation]),
+  [ if test -n "${with_cuda_prefix}"
+    then
+      CUDA_PREFIX="${with_cuda_prefix}"
+      CPPFLAGS="$CPPFLAGS -I${CUDA_PREFIX}/include"
+      LIBS="$LIBS -lcufft -lcuda -lcudart -L${CUDA_PREFIX}/lib64"
+      LDFLAGS="$LDFLAGS -Wl,-rpath=${CUDA_PREFIX}/lib64"
+      cudatest=true
+    fi
+  ],cudatest=false)
+])
+
+
 AC_DEFUN(DRAG_TYPE_SOCKLEN_T,
 [AC_REQUIRE([AC_HEADER_STDC])dnl
 AC_MSG_CHECKING(for socklen_t)
