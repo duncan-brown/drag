@@ -100,7 +100,7 @@ AC_DEFUN([DRAG_WITH_CUDA_PREFIX],
     then
       CUDA_PREFIX="${with_cuda_prefix}"
       CPPFLAGS="$CPPFLAGS -I${CUDA_PREFIX}/include"
-      LIBS="$LIBS -lcufft -lcuda -lcudart -L${CUDA_PREFIX}/lib64"
+      LIBS="$LIBS -lcufft -lcudart -L${CUDA_PREFIX}/lib64"
       LDFLAGS="$LDFLAGS -Wl,-rpath=${CUDA_PREFIX}/lib64"
       cudatest=true
     fi

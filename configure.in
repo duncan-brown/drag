@@ -18,7 +18,6 @@ AM_CONDITIONAL(TCPTEST, test x$tcptest = xtrue)
 AM_CONDITIONAL(FFTTCPTEST, test x$ffttest = xtrue -a x$tcptest = xtrue )
 
 DRAG_WITH_CUDA_PREFIX
-echo cudatest is ${cudatest}
 AM_CONDITIONAL(ENABLECUDA, test x${cudatest} = xtrue )
 
 AC_DEFINE_UNQUOTED(BUILD_SYSTEM_TYPE, "$build")
