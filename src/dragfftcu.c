@@ -45,9 +45,9 @@ int main( int argc, char* argv[] )
 {
   char       hostname[512];
   char 	     filename[4096];
-  int        maxloops = 2;
+  int        maxloops = 10;
   int        loop;
-  const int  maxsize = 1<<18; /* ramped this value up for "real"
+  const int  maxsize = 1<<23; /* ramped this value up for "real"
 				 tests */
   int        size    = 1;
   int        power   = 0;
@@ -142,14 +142,14 @@ int main( int argc, char* argv[] )
     }
 
 
-    for( size = 1<<17; size < maxsize; size *= 2)
+    for ( size = 1; size < maxsize; size *= 2)
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
 
       ++power;
 
-      fprintf( stderr, "\rsize hello = %d", size );
+      fprintf( stderr, "\rsize = %d", size );
 
       megaflops = drag_fft_flops( size, &secperfft, &add, &mul, &fma, 
           &secperfft_cuda, &megaflops_cuda ) / 1.e+6;
@@ -186,7 +186,7 @@ double drag_fft_flops( int size, double *secperfft,
   double        maxflops = 0;   /* best performance (flops)                */
   double        minratio = 1e6; /* best performance (second per fft)       */
   int           nreps    = 10;  /* number of repititions to find best time */
-  int           nffts    = 64;  /* anticipated number of ffts to take tmin */
+  int           nffts    = 1;   /* anticipated number of ffts to take tmin */
   fftwf_plan    plan;
 
   cudaEvent_t start, stop;
