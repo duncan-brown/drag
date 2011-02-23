@@ -369,6 +369,10 @@ double drag_fft_flops( int size, double *secperfft,
 
   cudaEventDestroy(stop);
   cudaEventDestroy(start);
+  cudaEventDestroy(tm1);
+  cudaEventDestroy(tm2);
+  cudaEventDestroy(tm3);
+  cudaEventDestroy(tm4);
 
   *secperfft = minratio;
   *secperfft_cuda = minratio_cuda;
