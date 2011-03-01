@@ -28,11 +28,10 @@ ideally this constant would be set via ./configure, but right now I
 
 int use_fftw = 1;
 int gpu_copy = 1;
-int use_timers = 0;
 
 double drag_fft_flops( int size, double *secperfft, 
 		double *add, double *mul, double *fma,
-                double *secperfft_cuda, double *maxflops_cuda ,double *ave_tm21,double *ave_tm32,double *ave_tm43);
+                double *secperfft_cuda, double *maxflops_cuda );
 
 fftwf_complex *in;
 fftwf_complex *out;
@@ -48,13 +47,13 @@ int main( int argc, char* argv[] )
   char 	     filename[4096];
   int        maxloops = 10;
   int        loop;
-  const int  maxsize = 1<<25; /* ramped this value up for "real"
+  const int  maxsize = 1<<24; /* ramped this value up for "real"
 				 tests */
   int        size    = 1;
   int        power   = 0;
   double     add, mul, fma;
   char      *hostptr = NULL;
-  FILE      *fp, *fp_ops,*fp_timer;
+  FILE      *fp, *fp_ops;
   time_t ticks = time(NULL);
 
   struct option long_options[] =
@@ -62,7 +61,6 @@ int main( int argc, char* argv[] )
     {"use-fftw",        no_argument,    &use_fftw,       1 },
     {"use-cuda",        no_argument,    &use_fftw,       0 },
     {"no-gpu-copy",     no_argument,    &gpu_copy,       0 },
-		{"use-timers",     no_argument,    &use_timers,       1},
     {"help",            no_argument,    0,              'h'},
     {0,0,0,0}
   };
@@ -122,27 +120,12 @@ int main( int argc, char* argv[] )
     snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.%d.out", 
         hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy", loop );
     fp = fopen( filename, "w" );
-
     if ( !fp )
     {
       fprintf( stderr, "could not open output file %d\n", loop );
       exit( 1 );
     }
-    fputs( "% log_2(npts)\tmega flops\tms / fft\tmega flops (cuda)\tms / fft (cuda)\n", 
-fp );
-
-		if (use_timers){
-			snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s.%d.out", 
-      hostname, "cuda_timers",loop );
-
-     	fp_timer = fopen(filename , "w" );
-      if ( !fp_timer )
-     	{
-       	fprintf( stderr, "could not open file timer file\n" );
-       	exit( 1 );
-     	}
-			fputs("Size \t Host To Device \t FFT \t Device to Host \t Total Time\n",fp_timer);
-		}
+    fputs( "# log_2(npts)\tmega flops\tms / fft\tmega flops (cuda)\tms / fft (cuda)\n", fp );
 
 
     if ( loop == 0 )
@@ -155,7 +138,6 @@ fp );
         fprintf( stderr, "could not open file ops file\n" );
         exit( 1 );
       }
-				
       fputs( "# add\tmul\tfma\n", fp_ops );
     }
 
@@ -164,21 +146,13 @@ fp );
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
-      double ave_tm21,ave_tm32,ave_tm43;
 
       ++power;
 
       fprintf( stderr, "\rsize = %d", size );
 
       megaflops = drag_fft_flops( size, &secperfft, &add, &mul, &fma, 
-          &secperfft_cuda, &megaflops_cuda,&ave_tm21,&ave_tm32,&ave_tm43 ) / 1.e+6;
-
-      
-   	 	if (use_timers){
-				  double ave_tm41=ave_tm21+ave_tm32+ave_tm43;				
-				  fprintf(fp_timer,"%8d\t%.3e\t%.3e\t%.3e\t%.3e\n",size,ave_tm21,ave_tm32,ave_tm43,ave_tm41);
-					fflush(fp_timer);
-			}
+          &secperfft_cuda, &megaflops_cuda ) / 1.e+6;
 
       fprintf( fp, "%8d\t%.3e\t%.3e\t%.3e\t%.3e\n", 
           power, megaflops, 1e+3 * secperfft, 
@@ -194,7 +168,6 @@ fp );
 
     fprintf( stderr, " [%d]\n", loop );
     fclose( fp );
-    fclose( fp_timer);
     if ( loop == 0 )
       fclose( fp_ops );
   }
@@ -206,7 +179,7 @@ fp );
 
 double drag_fft_flops( int size, double *secperfft, 
 		double *add, double *mul, double *fma,
-                double *secperfft_cuda, double *maxflops_cuda,double *ave_tm21,double *ave_tm32,double *ave_tm43 )
+                double *secperfft_cuda, double *maxflops_cuda )
 {
   const double  tmin     = 1;   /* minimum run time (seconds)              */
   double        fftflop;        /* ops for one fft */
@@ -216,7 +189,7 @@ double drag_fft_flops( int size, double *secperfft,
   int           nffts    = 1;   /* anticipated number of ffts to take tmin */
   fftwf_plan    plan;
 
-  cudaEvent_t start, stop,tm1,tm2,tm3,tm4;
+  cudaEvent_t start, stop;
   float duration_cuda = 0.0f;
   double        fftflop_cuda;        /* ops for one fft */
   double        minratio_cuda = 1e6; /* best performance (second per fft)       */
@@ -243,10 +216,6 @@ double drag_fft_flops( int size, double *secperfft,
   *maxflops_cuda = 0;
   cudaEventCreate( &start );
   cudaEventCreate( &stop );
-  cudaEventCreate( &tm1);
-  cudaEventCreate( &tm2);
-  cudaEventCreate( &tm3);
-  cudaEventCreate( &tm4);
 
   while ( nreps-- > 0 )
   {
@@ -257,14 +226,6 @@ double drag_fft_flops( int size, double *secperfft,
     double flops_cuda;
     double ratio_cuda;
 
-    float  duration_tm21;
-    float  duration_tm32;
-    float  duration_tm43;
-
-		float  duration_tm21_total=0;
-    float  duration_tm32_total=0;
-    float  duration_tm43_total=0;
-    
     while ( 1 )
     {
 
@@ -278,11 +239,6 @@ double drag_fft_flops( int size, double *secperfft,
       /* start cuda timer */
       cudaEventRecord( start, 0 );
 
-      /* Reset Timer Accumulators*/
-      duration_tm21_total=0;
-      duration_tm32_total=0;
-      duration_tm43_total=0;
-
       while ( iter-- > 0 )
       {
         if ( use_fftw )
@@ -291,33 +247,12 @@ double drag_fft_flops( int size, double *secperfft,
         }
         else if ( gpu_copy )
         {
-          if (use_timers) cudaEventRecord(tm1,0);
-					 
-          cudaMemcpy( (void**) &gpu_in, (void**) &local_in, 
+          cudaMemcpy( (void*) gpu_in, (void*) local_in, 
               size * sizeof(cufftComplex), cudaMemcpyHostToDevice );
-
-          if (use_timers) cudaEventRecord(tm2,0);
-
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
-
-          if (use_timers) cudaEventRecord(tm3,0);
-
-          cudaMemcpy( (void**) &local_out, (void**) &gpu_out, 
+          cudaMemcpy( (void*) local_out, (void*) gpu_out, 
               size * sizeof(cufftComplex), cudaMemcpyDeviceToHost );
-
-					if (use_timers) cudaEventRecord(tm4,0);       
-
-          if (use_timers)
-					{
-					  cudaEventElapsedTime( &duration_tm21, tm1, tm2 );
-						cudaEventElapsedTime( &duration_tm32, tm2, tm3 );
-						cudaEventElapsedTime( &duration_tm43, tm3, tm4 );
-            duration_tm21_total+=duration_tm21;
- 						duration_tm32_total+=duration_tm32;
-						duration_tm43_total+=duration_tm43;
-					} 
-					
-				}
+        }
         else
         {
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
@@ -337,10 +272,6 @@ double drag_fft_flops( int size, double *secperfft,
 
       /* cuda time in seconds */
       duration_cuda /= 1.0e-3;
-      duration_tm21_total /=1.0e-3;
-			duration_tm32_total /=1.0e-3;
-			duration_tm43_total /=1.0e-3;
- 
 
       if ( duration < tmin )
         nffts *= 2;
@@ -348,11 +279,6 @@ double drag_fft_flops( int size, double *secperfft,
         break;
 
     }
-
-		
-    *ave_tm21=duration_tm21_total/(double)nffts;
-		*ave_tm32=duration_tm32_total/(double)nffts;
-		*ave_tm43=duration_tm43_total/(double)nffts;
 
     ratio    = duration/ (double) nffts;
     flops    = fftflop/ratio;
@@ -369,10 +295,6 @@ double drag_fft_flops( int size, double *secperfft,
 
   cudaEventDestroy(stop);
   cudaEventDestroy(start);
-  cudaEventDestroy(tm1);
-  cudaEventDestroy(tm2);
-  cudaEventDestroy(tm3);
-  cudaEventDestroy(tm4);
 
   *secperfft = minratio;
   *secperfft_cuda = minratio_cuda;
