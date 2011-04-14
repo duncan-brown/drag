@@ -45,10 +45,12 @@ int main( int argc, char* argv[] )
 {
   char       hostname[512];
   char 	     filename[4096];
-  int        maxloops = 10;
+  int        maxloops = 1;
   int        loop;
   const int  maxsize = 1<<24; /* ramped this value up for "real"
 				 tests */
+  int        start_size = 0;
+  int        stop_size = 0;
   int        size    = 1;
   int        power   = 0;
   double     add, mul, fma;
@@ -58,10 +60,13 @@ int main( int argc, char* argv[] )
 
   struct option long_options[] =
   {
-    {"use-fftw",        no_argument,    &use_fftw,       1 },
-    {"use-cuda",        no_argument,    &use_fftw,       0 },
-    {"no-gpu-copy",     no_argument,    &gpu_copy,       0 },
-    {"help",            no_argument,    0,              'h'},
+    {"use-fftw",        no_argument,         &use_fftw,       1 },
+    {"use-cuda",        no_argument,         &use_fftw,       0 },
+    {"no-gpu-copy",     no_argument,         &gpu_copy,       0 },
+    {"min-size",        required_argument,   0,              'm'},
+    {"max-size",        required_argument,   0,              'M'},
+    {"num-loops",       required_argument,   0,              'l'},
+    {"help",            no_argument,         0,              'h'},
     {0,0,0,0}
   };
   int c;
@@ -70,15 +75,44 @@ int main( int argc, char* argv[] )
   {
     int option_index = 0;
     size_t optarg_len;
-    c = getopt_long_only( argc, argv, "h", long_options, &option_index );
+    c = getopt_long_only( argc, argv, "m:M:l:h", long_options, &option_index );
     if ( c == -1 ) break;
     switch ( c )
     {
       case 0:
         if ( long_options[option_index].flag != 0 ) break;
 
+      case 'm':
+        start_size = atoi( optarg );
+        if ( start_size < 1 || start_size > maxsize ) {
+          fprintf( stderr, "minimum fft length must be between 1 and %d\n",
+              maxsize );
+          exit( 1 );
+        }
+        start_size = 1 << start_size;
+        break;
+
+      case 'M':
+        stop_size = atoi( optarg );
+        if ( stop_size < 1 || stop_size > maxsize ) {
+          fprintf( stderr, "maximum fft length must be between 1 and %d\n",
+              maxsize );
+        }
+        stop_size = 1 << stop_size;
+        break;
+
+      case 'l':
+        maxloops = atoi( optarg );
+        if ( maxloops < 0 ) {
+          fprintf( stderr, "number of loops must be positive\n" );
+          exit( 1 );
+        }
+        break;
+
       case 'h':
-        fprintf( stderr, "useage: %s [--use-fftw|--use-cuda]\n", argv[0] );
+        fprintf( stderr, "usage: %s [--use-fftw|--use-cuda]\n", argv[0] );
+        fprintf( stderr, 
+            "          [--no-gpu-copy] [--min-size N] [--max-size M] [--num-loops I]\n" );
         exit( 0 );
         break;
 
@@ -115,6 +149,10 @@ int main( int argc, char* argv[] )
   cudaMemset( (void*) gpu_in, 0, maxsize * sizeof( cufftComplex ) );
   cudaMemset( (void*) gpu_out, 0, maxsize * sizeof( cufftComplex ) );
 
+  /* don't bother the CPU */
+  cudaSetDeviceFlags(cudaDeviceBlockingSync);
+  cudaSetDevice(0);
+
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
     snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.%d.out", 
@@ -142,7 +180,7 @@ int main( int argc, char* argv[] )
     }
 
 
-    for ( size = 1; size < maxsize; size *= 2)
+    for ( size = start_size; size < stop_size; size *= 2)
     {
       double megaflops, megaflops_cuda;
       double secperfft, secperfft_cuda;
@@ -255,7 +293,9 @@ double drag_fft_flops( int size, double *secperfft,
         }
         else
         {
+          cudaThreadSynchronize();
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
+          cudaThreadSynchronize();
         }
       }
 
