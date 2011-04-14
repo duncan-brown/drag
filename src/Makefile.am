@@ -1,5 +1,5 @@
 if ENABLECUDA
-CUDAPROGS = dragfftcu
+CUDAPROGS = dragfftcu dragfftcutime
 else
 CUDAPROGS =
 endif
@@ -8,6 +8,7 @@ bin_PROGRAMS = dragfft dragtcp $(CUDAPROGS)
 dragfft_SOURCES = dragfft.c timer.c timer.h
 dragtcp_SOURCES = dragtcp.c timer.c timer.h
 dragfftcu_SOURCES = dragfftcu.c timer.c timer.h
+dragfftcutime_SOURCES = dragfftcutime.c timer.c timer.h
 
 if FFTTCPTEST
 TESTS = dragtcp.sh dragfft
