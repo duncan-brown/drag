@@ -137,9 +137,13 @@ int main( int argc, char* argv[] )
   memset( in,  0, maxsize * sizeof( fftwf_complex ) );
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
 
+  /* don't bother the CPU */
+  cudaSetDeviceFlags(cudaDeviceBlockingSync);
+  cudaSetDevice(0);
+
   /* allocate local space for cuda ffts */
-  local_in  = malloc( maxsize * sizeof( cufftComplex ) );
-  local_out = malloc( maxsize * sizeof( cufftComplex ) );
+  cudaHostAlloc((void**) &local_in, maxsize * sizeof( cufftComplex ) ,0);
+  cudaHostAlloc((void**) &local_out, maxsize * sizeof( cufftComplex ) ,0);
   memset( local_in,  0, maxsize * sizeof( cufftComplex ) );
   memset( local_out, 0, maxsize * sizeof( cufftComplex ) );
 
@@ -148,10 +152,6 @@ int main( int argc, char* argv[] )
   cudaMalloc( (void**) &gpu_out, maxsize * sizeof( cufftComplex ) );
   cudaMemset( (void*) gpu_in, 0, maxsize * sizeof( cufftComplex ) );
   cudaMemset( (void*) gpu_out, 0, maxsize * sizeof( cufftComplex ) );
-
-  /* don't bother the CPU */
-  cudaSetDeviceFlags(cudaDeviceBlockingSync);
-  cudaSetDevice(0);
 
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
@@ -284,13 +284,15 @@ double drag_fft_flops( int size, double *secperfft,
           fftwf_execute( plan );
         }
         else if ( gpu_copy )
-        {
-          cudaMemcpy( (void*) gpu_in, (void*) local_in, 
-              size * sizeof(cufftComplex), cudaMemcpyHostToDevice );
+        { 
+          cudaThreadSynchronize();
+          cudaMemcpyAsync( (void*) gpu_in, (void*) local_in, 
+              size * sizeof(cufftComplex), cudaMemcpyHostToDevice,0 );
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
-          cudaMemcpy( (void*) local_out, (void*) gpu_out, 
-              size * sizeof(cufftComplex), cudaMemcpyDeviceToHost );
-        }
+          cudaMemcpyAsync( (void*) local_out, (void*) gpu_out, 
+              size * sizeof(cufftComplex), cudaMemcpyDeviceToHost,0 );
+          cudaThreadSynchronize();
+	}
         else
         {
           cudaThreadSynchronize();
