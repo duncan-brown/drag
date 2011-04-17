@@ -4,8 +4,9 @@ else
 CUDAPROGS =
 endif
 
-bin_PROGRAMS = dragfft dragtcp $(CUDAPROGS)
+bin_PROGRAMS = dragfft dragfftsilent dragtcp $(CUDAPROGS)
 dragfft_SOURCES = dragfft.c timer.c timer.h
+dragfftsilent_SOURCES = dragfftsilent.c timer.c timer.h
 dragtcp_SOURCES = dragtcp.c timer.c timer.h
 dragfftcu_SOURCES = dragfftcu.c timer.c timer.h
 

@@ -28,6 +28,7 @@ ideally this constant would be set via ./configure, but right now I
 
 int use_fftw = 1;
 int gpu_copy = 1;
+int silent = 0;
 
 double drag_fft_flops( int size, double *secperfft, 
 		double *add, double *mul, double *fma,
@@ -60,6 +61,7 @@ int main( int argc, char* argv[] )
 
   struct option long_options[] =
   {
+    {"silent",          no_argument,         &silent,         1 },
     {"use-fftw",        no_argument,         &use_fftw,       1 },
     {"use-cuda",        no_argument,         &use_fftw,       0 },
     {"no-gpu-copy",     no_argument,         &gpu_copy,       0 },
@@ -155,9 +157,16 @@ int main( int argc, char* argv[] )
 
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
-    snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.%d.out", 
-        hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy", loop );
-    fp = fopen( filename, "w" );
+    if ( silent )
+    {
+      fp = fopen( "/dev/null", "w" );
+    }
+    else
+    {
+      snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.%d.out", 
+          hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy", loop );
+      fp = fopen( filename, "w" );
+    }
     if ( !fp )
     {
       fprintf( stderr, "could not open output file %d\n", loop );
@@ -168,9 +177,16 @@ int main( int argc, char* argv[] )
 
     if ( loop == 0 )
     {
-      snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.out", 
-          hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy" );
-      fp_ops = fopen( filename, "w" );
+      if ( silent )
+      {
+        fp_ops = fopen( "/dev/null", "w" );
+      } 
+      else
+      {
+        snprintf( filename, 4096 * sizeof(char), FILENAME "-%s-%s-%s.out", 
+            hostname, use_fftw ? "fftw" : "cuda", gpu_copy ? "copy" : "nocopy" );
+        fp_ops = fopen( filename, "w" );
+      }
       if ( !fp_ops )
       {
         fprintf( stderr, "could not open file ops file\n" );
@@ -179,7 +195,6 @@ int main( int argc, char* argv[] )
       fputs( "# add\tmul\tfma\n", fp_ops );
     }
 
-
     for ( size = start_size; size < stop_size; size *= 2)
     {
       double megaflops, megaflops_cuda;
@@ -187,7 +202,7 @@ int main( int argc, char* argv[] )
 
       ++power;
 
-      fprintf( stderr, "\rsize = %d", size );
+      if ( ! silent ) fprintf( stderr, "\rsize = %d", size );
 
       megaflops = drag_fft_flops( size, &secperfft, &add, &mul, &fma, 
           &secperfft_cuda, &megaflops_cuda ) / 1.e+6;
@@ -204,7 +219,8 @@ int main( int argc, char* argv[] )
       }
     }
 
-    fprintf( stderr, " [%d]\n", loop );
+    if ( ! silent ) fprintf( stderr, " [%d]\n", loop );
+
     fclose( fp );
     if ( loop == 0 )
       fclose( fp_ops );
