@@ -311,9 +311,7 @@ double drag_fft_flops( int size, double *secperfft,
 	}
         else
         {
-          cudaThreadSynchronize();
           cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
-          cudaThreadSynchronize();
         }
       }
 
@@ -350,6 +348,7 @@ double drag_fft_flops( int size, double *secperfft,
   }
 
   fftwf_destroy_plan( plan );
+  cufftDestroy( cuplan );
 
   cudaEventDestroy(stop);
   cudaEventDestroy(start);
