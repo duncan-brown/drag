@@ -12,7 +12,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cufft.h>
-
+#include <cuda_error.h>
 
 /*
 ideally this constant would be set via ./configure, but right now I
@@ -140,20 +140,20 @@ int main( int argc, char* argv[] )
   memset( out, 0, maxsize * sizeof( fftwf_complex ) );
 
   /* don't bother the CPU */
-  cudaSetDeviceFlags(cudaDeviceBlockingSync);
-  cudaSetDevice(0);
+  cudaSafeCall(cudaSetDeviceFlags(cudaDeviceBlockingSync));
+  cudaSafeCall(cudaSetDevice(0));
 
   /* allocate local space for cuda ffts */
-  cudaHostAlloc((void**) &local_in, maxsize * sizeof( cufftComplex ) ,0);
-  cudaHostAlloc((void**) &local_out, maxsize * sizeof( cufftComplex ) ,0);
+  cudaSafeCall(cudaHostAlloc((void**) &local_in, maxsize * sizeof( cufftComplex ) ,0));
+  cudaSafeCall(cudaHostAlloc((void**) &local_out, maxsize * sizeof( cufftComplex ) ,0));
   memset( local_in,  0, maxsize * sizeof( cufftComplex ) );
   memset( local_out, 0, maxsize * sizeof( cufftComplex ) );
 
   /* allocate remote space for cuda ffts */
-  cudaMalloc( (void**) &gpu_in, maxsize * sizeof( cufftComplex ) );
-  cudaMalloc( (void**) &gpu_out, maxsize * sizeof( cufftComplex ) );
-  cudaMemset( (void*) gpu_in, 0, maxsize * sizeof( cufftComplex ) );
-  cudaMemset( (void*) gpu_out, 0, maxsize * sizeof( cufftComplex ) );
+  cudaSafeCall(cudaMalloc( (void**) &gpu_in, maxsize * sizeof( cufftComplex ) ));
+  cudaSafeCall(cudaMalloc( (void**) &gpu_out, maxsize * sizeof( cufftComplex ) ));
+  cudaSafeCall(cudaMemset( (void*) gpu_in, 0, maxsize * sizeof( cufftComplex ) ));
+  cudaSafeCall(cudaMemset( (void*) gpu_out, 0, maxsize * sizeof( cufftComplex ) ));
 
   for ( loop = 0, power = 0; loop < maxloops; ++loop, power = 0 )
   {
@@ -256,7 +256,7 @@ double drag_fft_flops( int size, double *secperfft,
   fftflop = *add + *mul + FUSEMULADD * *fma;
 
   /* create the cuda plan and number of operations */
-  cufftPlan1d( &cuplan, size, CUFFT_C2C, 1 );
+  cufftSafeCall(cufftPlan1d( &cuplan, size, CUFFT_C2C, 1 ));
   fftflop_cuda = fftflop;
 
   /* zero out the fftw memory */
@@ -302,16 +302,16 @@ double drag_fft_flops( int size, double *secperfft,
         else if ( gpu_copy )
         { 
           cudaThreadSynchronize();
-          cudaMemcpyAsync( (void*) gpu_in, (void*) local_in, 
-              size * sizeof(cufftComplex), cudaMemcpyHostToDevice,0 );
-          cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
-          cudaMemcpyAsync( (void*) local_out, (void*) gpu_out, 
-              size * sizeof(cufftComplex), cudaMemcpyDeviceToHost,0 );
+          cudaSafeCall(cudaMemcpyAsync( (void*) gpu_in, (void*) local_in, 
+              size * sizeof(cufftComplex), cudaMemcpyHostToDevice,0 ));
+          cufftSafeCall(cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD ));
+          cudaSafeCall(cudaMemcpyAsync( (void*) local_out, (void*) gpu_out, 
+              size * sizeof(cufftComplex), cudaMemcpyDeviceToHost,0 ));
           cudaThreadSynchronize();
 	}
         else
         {
-          cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD );
+          cufftSafeCall(cufftExecC2C( cuplan, gpu_in, gpu_out, CUFFT_FORWARD ));
         }
       }
 

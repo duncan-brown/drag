@@ -8,7 +8,7 @@ bin_PROGRAMS = dragfft dragfftsilent dragtcp $(CUDAPROGS)
 dragfft_SOURCES = dragfft.c timer.c timer.h
 dragfftsilent_SOURCES = dragfftsilent.c timer.c timer.h
 dragtcp_SOURCES = dragtcp.c timer.c timer.h
-dragfftcu_SOURCES = dragfftcu.c timer.c timer.h
+dragfftcu_SOURCES = dragfftcu.c timer.c timer.h cuda_error.c cuda_error.h 
 
 if FFTTCPTEST
 TESTS = dragtcp.sh dragfft
