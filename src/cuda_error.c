@@ -2,7 +2,7 @@
 
 void cudaSafeCall(cudaError_t error){
   if ( cudaSuccess != error ){
-    fprintf( stderr, "cudaSafeCall() error: %s", cudaGetErrorString( error ) );
+    fprintf( stderr, "cudaSafeCall() error: %s\n", cudaGetErrorString( error ) );
     exit(1);
   }
   return;
@@ -10,6 +10,6 @@ void cudaSafeCall(cudaError_t error){
 
 void cufftSafeCall(cufftResult error){
   if ( CUFFT_SUCCESS != error)
-    fprintf(stderr, "cufftSafeCall() error : %i",error);
+    fprintf(stderr, "cufftSafeCall() error : %i\n",error);
   return;  
 }
